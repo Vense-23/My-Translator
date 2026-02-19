@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>手机简易翻译</title>
+    <title>AI 智能翻译 (Gemini 驱动)</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -23,14 +23,9 @@
             box-shadow: 0 4px 12px rgba(0,0,0,0.08);
         }
 
-        h2 {
-            text-align: center;
-            color: #333;
-            margin-top: 0;
-            margin-bottom: 20px;
-        }
+        h2 { text-align: center; color: #333; margin-top: 0; margin-bottom: 20px; }
 
-        textarea, select, button {
+        textarea, select, button, input {
             width: 100%;
             margin-bottom: 15px;
             padding: 12px;
@@ -41,147 +36,168 @@
             outline: none;
         }
 
-        textarea:focus, select:focus {
-            border-color: #409eff;
-        }
+        textarea:focus, select:focus, input:focus { border-color: #409eff; }
+        textarea { resize: vertical; min-height: 100px; }
 
-        textarea {
-            resize: vertical;
-            min-height: 120px;
+        .api-settings {
+            background-color: #e8f4fd;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border: 1px solid #d1e8ff;
         }
+        .api-settings h3 { margin: 0 0 10px 0; font-size: 14px; color: #409eff; }
+        .api-settings input { margin-bottom: 10px; padding: 10px; font-size: 14px; }
+        .save-btn { background-color: #409eff; color: white; border: none; cursor: pointer; padding: 10px; font-weight: bold;}
+        .save-btn:active { background-color: #3a8ee6; }
 
-        /* 翻译按钮：蓝色 */
-        .translate-btn {
-            background-color: #409eff;
-            color: white;
-            border: none;
-            cursor: pointer;
-            font-weight: bold;
-            transition: 0.3s;
-        }
-        .translate-btn:active { background-color: #3a8ee6; }
+        .translate-btn { background-color: #67c23a; color: white; font-weight: bold; transition: 0.3s; border: none; cursor: pointer;}
+        .translate-btn:active { background-color: #5daf34; }
 
-        #outputText {
-            background-color: #fafafa;
-            color: #333;
-            margin-bottom: 10px; 
-        }
+        .btn-group { display: flex; gap: 10px; }
+        .btn-group button { margin-bottom: 0; }
+        .copy-btn { background-color: #e6a23c; color: white; font-weight: bold; border: none; cursor: pointer;}
+        .clear-btn { background-color: #f56c6c; color: white; font-weight: bold; border: none; cursor: pointer;}
 
-        /* 复制按钮：绿色 */
-        .copy-btn {
-            background-color: #67c23a; 
-            color: white;
-            border: none;
-            cursor: pointer;
-            font-weight: bold;
-            transition: 0.3s;
-            margin-bottom: 10px;
-        }
-        .copy-btn:active { background-color: #5daf34; }
-
-        /* 清空按钮：灰红色，不那么刺眼 */
-        .clear-btn {
-            background-color: #f56c6c; 
-            color: white;
-            border: none;
-            cursor: pointer;
-            font-weight: bold;
-            transition: 0.3s;
-            margin-bottom: 0;
-        }
-        .clear-btn:active { background-color: #e65d5d; }
+        #outputText { background-color: #fafafa; color: #333; margin-top: 15px; min-height: 150px; }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <h2>简易翻译工具 🌍</h2>
+        <h2>AI 智能翻译 (Gemini) 🌍</h2>
+
+        <div class="api-settings" id="apiSettings">
+            <h3>⚙️ 首次使用请设置 Google API Key</h3>
+            <input type="password" id="apiKeyInput" placeholder="输入你的 Google API Key (AIzaSy...)">
+            <input type="text" id="modelInput" placeholder="模型名称" value="gemini-1.5-flash">
+            <button class="save-btn" onclick="saveApiSettings()">保存设置并隐藏</button>
+        </div>
         
-        <textarea id="inputText" placeholder="请输入想要翻译的句子..."></textarea>
+        <textarea id="inputText" placeholder="请输入需要翻译的内容..."></textarea>
         
         <select id="targetLang">
-            <option value="en">翻译为：英语 (English)</option>
-            <option value="zh-CN">翻译为：中文 (Chinese)</option>
-            <option value="ja">翻译为：日语 (Japanese)</option>
-            <option value="ko">翻译为：韩语 (Korean)</option>
-            <option value="fr">翻译为：法语 (French)</option>
-            <option value="es">翻译为：西班牙语 (Spanish)</option>
-            <option value="ru">翻译为：俄语 (Russian)</option>
+            <option value="越南语">翻译为：越南语 (Vietnamese)</option>
+            <option value="泰语">翻译为：泰语 (Thai)</option>
+            <option value="英语">翻译为：英语</option>
+            <option value="中文">翻译为：中文</option>
+            <option value="日语">翻译为：日语</option>
+            <option value="地道英语口语">翻译为：地道英语口语 (含润色)</option>
+            <option value="商务正式英语">翻译为：商务正式英语 (发邮件用)</option>
         </select>
         
-        <button class="translate-btn" onclick="translateText()">点击翻译</button>
+        <button class="translate-btn" onclick="translateWithGemini()">🚀 召唤 Gemini 翻译</button>
         
-        <textarea id="outputText" placeholder="翻译结果会显示在这里..." readonly></textarea>
+        <textarea id="outputText" placeholder="AI 翻译结果会显示在这里..." readonly></textarea>
         
-        <button id="copyBtn" class="copy-btn" onclick="copyResult()">📋 一键复制结果</button>
-        <button class="clear-btn" onclick="clearText()">🗑️ 一键清空</button>
+        <div class="btn-group">
+            <button id="copyBtn" class="copy-btn" onclick="copyResult()">📋 一键复制</button>
+            <button class="clear-btn" onclick="clearText()">🗑️ 一键清空</button>
+        </div>
     </div>
 
     <script>
-        async function translateText() {
+        window.onload = function() {
+            const savedKey = localStorage.getItem('gemini_api_key');
+            if (savedKey) {
+                document.getElementById('apiSettings').style.display = 'none';
+                document.getElementById('apiKeyInput').value = savedKey;
+                document.getElementById('modelInput').value = localStorage.getItem('gemini_model') || 'gemini-1.5-flash';
+            }
+        };
+
+        function saveApiSettings() {
+            const key = document.getElementById('apiKeyInput').value;
+            const model = document.getElementById('modelInput').value;
+            
+            if (!key.trim()) { alert("请先输入 API Key！"); return; }
+
+            localStorage.setItem('gemini_api_key', key.trim());
+            localStorage.setItem('gemini_model', model.trim());
+            
+            alert("✅ Google API 设置已保存在本地缓存！");
+            document.getElementById('apiSettings').style.display = 'none';
+        }
+
+        async function translateWithGemini() {
             const text = document.getElementById('inputText').value;
             const targetLang = document.getElementById('targetLang').value;
             const outputBox = document.getElementById('outputText');
+            
+            const apiKey = localStorage.getItem('gemini_api_key') || document.getElementById('apiKeyInput').value;
+            const modelName = localStorage.getItem('gemini_model') || document.getElementById('modelInput').value;
 
-            if (!text.trim()) {
-                alert("请先输入需要翻译的内容哦！");
+            if (!text.trim()) { alert("请先输入需要翻译的内容！"); return; }
+            if (!apiKey) {
+                alert("请先设置 Google API Key！");
+                document.getElementById('apiSettings').style.display = 'block';
                 return;
             }
 
-            outputBox.value = "⏳ 正在努力翻译中...";
+            outputBox.value = "⏳ Gemini 正在思考并翻译中...";
+
+            // 专属 Gemini 的接口地址
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+            const systemPrompt = `你是一个精通多国语言的顶级翻译官。请将用户输入的内容翻译成【${targetLang}】。要求：翻译要准确、流畅、符合目标语言的母语习惯。如果目标语言是口语或商务英语，请严格调整语气。只返回纯文本翻译结果，不要输出任何解释、拼音、音标或多余的对话。`;
+
+            // 专属 Gemini 的数据格式
+            const payload = {
+                systemInstruction: {
+                    parts: [{ text: systemPrompt }]
+                },
+                contents: [{
+                    parts: [{ text: text }]
+                }],
+                generationConfig: {
+                    temperature: 0.2
+                }
+            };
 
             try {
-                const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`;
-                const response = await fetch(url);
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
                 const data = await response.json();
-                
-                let translatedResult = "";
-                if (data && data[0]) {
-                    data[0].forEach(item => {
-                        if (item[0]) translatedResult += item[0];
-                    });
+
+                if (!response.ok) {
+                    throw new Error(data.error?.message || "请求失败");
                 }
-                
-                outputBox.value = translatedResult;
+
+                // 解析 Gemini 的返回结果
+                if (data.candidates && data.candidates[0].content.parts[0].text) {
+                    outputBox.value = data.candidates[0].content.parts[0].text.trim();
+                } else {
+                    outputBox.value = "❌ 未获取到翻译结果，可能触发了安全拦截。";
+                }
 
             } catch (error) {
                 console.error(error);
-                outputBox.value = "❌ 翻译失败，请检查网络连接或稍后再试。";
+                outputBox.value = `❌ 翻译出错：\n${error.message}\n请检查 API Key 是否正确或网络是否连通。`;
+                document.getElementById('apiSettings').style.display = 'block';
             }
         }
 
         function copyResult() {
             const outputBox = document.getElementById('outputText');
-            const copyBtn = document.getElementById('copyBtn');
-            const textToCopy = outputBox.value;
-
-            if (!textToCopy.trim() || textToCopy.startsWith("⏳") || textToCopy.startsWith("❌") || textToCopy === "翻译结果会显示在这里...") {
-                alert("当前没有可复制的翻译结果哦！");
-                return;
-            }
-
+            if (!outputBox.value.trim() || outputBox.value.startsWith("⏳") || outputBox.value.startsWith("❌")) return;
+            
             outputBox.select();
-            outputBox.setSelectionRange(0, 99999); 
-
-            navigator.clipboard.writeText(textToCopy).then(() => {
-                const originalText = copyBtn.innerText;
-                copyBtn.innerText = "✅ 复制成功！";
-                copyBtn.style.backgroundColor = "#85ce61"; 
-                
-                setTimeout(() => {
-                    copyBtn.innerText = originalText;
-                    copyBtn.style.backgroundColor = "#67c23a";
-                }, 2000);
-            }).catch(err => {
-                alert("复制失败，请尝试长按文本框手动复制。");
-            });
+            outputBox.setSelectionRange(0, 99999);
+            navigator.clipboard.writeText(outputBox.value).then(() => {
+                const btn = document.getElementById('copyBtn');
+                const oldText = btn.innerText;
+                btn.innerText = "✅ 复制成功";
+                btn.style.backgroundColor = "#67c23a";
+                setTimeout(() => { btn.innerText = oldText; btn.style.backgroundColor = "#e6a23c"; }, 2000);
+            }).catch(err => { alert("复制失败，请尝试长按文本框手动复制。"); });
         }
 
-        // 新增：清空功能
         function clearText() {
             document.getElementById('inputText').value = '';
             document.getElementById('outputText').value = '';
-            // 让光标自动回到输入框，方便直接打字
             document.getElementById('inputText').focus();
         }
     </script>
