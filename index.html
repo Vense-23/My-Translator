@@ -51,6 +51,42 @@
         .save-btn { background-color: #409eff; color: white; border: none; cursor: pointer; padding: 10px; font-weight: bold;}
         .save-btn:active { background-color: #3a8ee6; }
 
+        /* 新增：输入框容器，用来定位麦克风按钮 */
+        .input-wrapper { position: relative; }
+        
+        /* 新增：麦克风按钮样式 */
+        .mic-btn {
+            position: absolute;
+            right: 10px;
+            bottom: 25px;
+            background: #f0f2f5;
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            font-size: 20px;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 0;
+            margin: 0;
+            transition: 0.3s;
+        }
+
+        /* 录音时的红点闪烁动画 */
+        .mic-btn.recording {
+            background: #f56c6c;
+            color: white;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(245, 108, 108, 0.7); }
+            70% { transform: scale(1.1); box-shadow: 0 0 0 10px rgba(245, 108, 108, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(245, 108, 108, 0); }
+        }
+
         .translate-btn { background-color: #67c23a; color: white; font-weight: bold; transition: 0.3s; border: none; cursor: pointer;}
         .translate-btn:active { background-color: #5daf34; }
 
@@ -74,7 +110,10 @@
             <button class="save-btn" onclick="saveApiSettings()">保存设置并隐藏</button>
         </div>
         
-        <textarea id="inputText" placeholder="请输入需要翻译的内容..."></textarea>
+        <div class="input-wrapper">
+            <textarea id="inputText" placeholder="请输入或语音输入需要翻译的内容..."></textarea>
+            <button id="micBtn" class="mic-btn" onclick="toggleRecording()" title="点击开始说话">🎤</button>
+        </div>
         
         <select id="targetLang">
             <option value="越南语">翻译为：越南语 (Vietnamese)</option>
@@ -97,12 +136,79 @@
     </div>
 
     <script>
+        // === 语音识别逻辑 ===
+        let recognition = null;
+        let isRecording = false;
+
+        function initSpeech() {
+            // 兼容不同浏览器的语音接口
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                alert("当前浏览器不支持语音输入，请尝试使用 Safari 或 Chrome 浏览器。");
+                document.getElementById('micBtn').style.display = 'none';
+                return;
+            }
+
+            recognition = new SpeechRecognition();
+            recognition.lang = 'zh-CN'; // 默认识别中文
+            recognition.continuous = false; // 说话停顿后自动结束
+            recognition.interimResults = false; // 只返回最终结果
+
+            recognition.onstart = function() {
+                isRecording = true;
+                const micBtn = document.getElementById('micBtn');
+                micBtn.classList.add('recording');
+                document.getElementById('inputText').placeholder = "正在聆听，请说话...";
+            };
+
+            recognition.onresult = function(event) {
+                const transcript = event.results[0][0].transcript;
+                const inputBox = document.getElementById('inputText');
+                // 将识别的文字追加到输入框
+                if (inputBox.value) {
+                    inputBox.value += " " + transcript;
+                } else {
+                    inputBox.value = transcript;
+                }
+            };
+
+            recognition.onerror = function(event) {
+                console.error("语音识别错误: ", event.error);
+                if(event.error === 'not-allowed') {
+                    alert("语音输入失败：请在手机设置中允许浏览器访问麦克风。");
+                }
+                stopRecording();
+            };
+
+            recognition.onend = function() {
+                stopRecording();
+            };
+        }
+
+        function toggleRecording() {
+            if (!recognition) initSpeech();
+            if (!recognition) return;
+
+            if (isRecording) {
+                recognition.stop();
+            } else {
+                recognition.start();
+            }
+        }
+
+        function stopRecording() {
+            isRecording = false;
+            document.getElementById('micBtn').classList.remove('recording');
+            document.getElementById('inputText').placeholder = "请输入或语音输入需要翻译的内容...";
+        }
+
+        // === 以下为原有的翻译、复制和设置逻辑 ===
         window.onload = function() {
             const savedKey = localStorage.getItem('gemini_api_key');
             if (savedKey) {
                 document.getElementById('apiSettings').style.display = 'none';
                 document.getElementById('apiKeyInput').value = savedKey;
-                document.getElementById('modelInput').value = localStorage.getItem('gemini_model') || 'gemini-1.5-flash';
+                document.getElementById('modelInput').value = localStorage.getItem('gemini_model') || 'gemini-2.5-flash';
             }
         };
 
@@ -136,21 +242,13 @@
 
             outputBox.value = "⏳ Gemini 正在思考并翻译中...";
 
-            // 专属 Gemini 的接口地址
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
             const systemPrompt = `你是一个精通多国语言的顶级翻译官。请将用户输入的内容翻译成【${targetLang}】。要求：翻译要准确、流畅、符合目标语言的母语习惯。如果目标语言是口语或商务英语，请严格调整语气。只返回纯文本翻译结果，不要输出任何解释、拼音、音标或多余的对话。`;
 
-            // 专属 Gemini 的数据格式
             const payload = {
-                systemInstruction: {
-                    parts: [{ text: systemPrompt }]
-                },
-                contents: [{
-                    parts: [{ text: text }]
-                }],
-                generationConfig: {
-                    temperature: 0.2
-                }
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+                contents: [{ parts: [{ text: text }] }],
+                generationConfig: { temperature: 0.2 }
             };
 
             try {
@@ -162,11 +260,8 @@
 
                 const data = await response.json();
 
-                if (!response.ok) {
-                    throw new Error(data.error?.message || "请求失败");
-                }
+                if (!response.ok) { throw new Error(data.error?.message || "请求失败"); }
 
-                // 解析 Gemini 的返回结果
                 if (data.candidates && data.candidates[0].content.parts[0].text) {
                     outputBox.value = data.candidates[0].content.parts[0].text.trim();
                 } else {
