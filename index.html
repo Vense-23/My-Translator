@@ -75,7 +75,6 @@
             transition: 0.3s;
         }
 
-        /* 录音时的红点闪烁动画 */
         .mic-btn.recording {
             background: #f56c6c;
             color: white;
@@ -90,9 +89,13 @@
         .translate-btn { background-color: #67c23a; color: white; font-weight: bold; transition: 0.3s; border: none; cursor: pointer;}
         .translate-btn:active { background-color: #5daf34; }
 
-        .btn-group { display: flex; gap: 10px; }
-        .btn-group button { margin-bottom: 0; }
+        /* 优化底部按钮组：支持自动折行，防止挤压 */
+        .btn-group { display: flex; gap: 10px; flex-wrap: wrap; }
+        .btn-group button { margin-bottom: 0; flex: 1; min-width: 30%; font-size: 14px; padding: 10px; }
+        
         .copy-btn { background-color: #e6a23c; color: white; font-weight: bold; border: none; cursor: pointer;}
+        /* 朗读按钮样式：紫色 */
+        .speak-btn { background-color: #9c27b0; color: white; font-weight: bold; border: none; cursor: pointer;}
         .clear-btn { background-color: #f56c6c; color: white; font-weight: bold; border: none; cursor: pointer;}
 
         #outputText { background-color: #fafafa; color: #333; margin-top: 15px; min-height: 150px; }
@@ -135,13 +138,14 @@
         <textarea id="outputText" placeholder="AI 翻译结果会显示在这里..." readonly></textarea>
         
         <div class="btn-group">
-            <button id="copyBtn" class="copy-btn" onclick="copyResult()">📋 一键复制</button>
-            <button class="clear-btn" onclick="clearText()">🗑️ 一键清空</button>
+            <button id="speakBtn" class="speak-btn" onclick="speakResult()">🔊 朗读</button>
+            <button id="copyBtn" class="copy-btn" onclick="copyResult()">📋 复制</button>
+            <button class="clear-btn" onclick="clearText()">🗑️ 清空</button>
         </div>
     </div>
 
     <script>
-        // === 语音识别逻辑 ===
+        // === 语音识别逻辑 (麦克风听你说话) ===
         let recognition = null;
         let isRecording = false;
 
@@ -160,49 +164,78 @@
 
             recognition.onstart = function() {
                 isRecording = true;
-                const micBtn = document.getElementById('micBtn');
-                micBtn.classList.add('recording');
+                document.getElementById('micBtn').classList.add('recording');
                 document.getElementById('inputText').placeholder = "正在聆听，请说话...";
             };
 
             recognition.onresult = function(event) {
                 const transcript = event.results[0][0].transcript;
                 const inputBox = document.getElementById('inputText');
-                if (inputBox.value) {
-                    inputBox.value += " " + transcript;
-                } else {
-                    inputBox.value = transcript;
-                }
+                if (inputBox.value) inputBox.value += " " + transcript;
+                else inputBox.value = transcript;
             };
 
             recognition.onerror = function(event) {
                 console.error("语音识别错误: ", event.error);
-                if(event.error === 'not-allowed') {
-                    alert("语音输入失败：请在手机设置中允许浏览器访问麦克风。");
-                }
+                if(event.error === 'not-allowed') alert("请在手机设置中允许浏览器访问麦克风。");
                 stopRecording();
             };
 
-            recognition.onend = function() {
-                stopRecording();
-            };
+            recognition.onend = function() { stopRecording(); };
         }
 
         function toggleRecording() {
             if (!recognition) initSpeech();
             if (!recognition) return;
-
-            if (isRecording) {
-                recognition.stop();
-            } else {
-                recognition.start();
-            }
+            isRecording ? recognition.stop() : recognition.start();
         }
 
         function stopRecording() {
             isRecording = false;
             document.getElementById('micBtn').classList.remove('recording');
             document.getElementById('inputText').placeholder = "请输入或语音输入需要翻译的内容...";
+        }
+
+        // === 语音播报逻辑 (朗读翻译结果) ===
+        function speakResult() {
+            const textToSpeak = document.getElementById('outputText').value;
+            
+            // 检查是否有实质内容
+            if (!textToSpeak.trim() || textToSpeak.startsWith("⏳") || textToSpeak.startsWith("❌")) {
+                alert("当前没有可朗读的翻译结果哦！");
+                return;
+            }
+
+            // 检查浏览器是否支持语音播报
+            if (!window.speechSynthesis) {
+                alert("您的浏览器不支持语音播报功能。");
+                return;
+            }
+
+            // 如果正在读，先打断它
+            window.speechSynthesis.cancel();
+
+            const utterance = new SpeechSynthesisUtterance(textToSpeak);
+            const targetLangVal = document.getElementById('targetLang').value;
+
+            // 根据下拉框选择的语言，匹配对应的发音引擎
+            if (targetLangVal.includes("越南语")) {
+                utterance.lang = 'vi-VN';
+            } else if (targetLangVal.includes("泰语")) {
+                utterance.lang = 'th-TH';
+            } else if (targetLangVal.includes("日语")) {
+                utterance.lang = 'ja-JP';
+            } else if (targetLangVal.includes("韩语")) {
+                utterance.lang = 'ko-KR';
+            } else if (targetLangVal.includes("中文")) {
+                utterance.lang = 'zh-CN';
+            } else {
+                // 默认各种英语风格使用美式英语朗读
+                utterance.lang = 'en-US';
+            }
+
+            // 开始朗读
+            window.speechSynthesis.speak(utterance);
         }
 
         // === API设置与翻译逻辑 ===
@@ -218,12 +251,9 @@
         function saveApiSettings() {
             const key = document.getElementById('apiKeyInput').value;
             const model = document.getElementById('modelInput').value;
-            
             if (!key.trim()) { alert("请先输入 API Key！"); return; }
-
             localStorage.setItem('gemini_api_key', key.trim());
             localStorage.setItem('gemini_model', model.trim());
-            
             alert("✅ Google API 设置已保存在本地缓存！");
             document.getElementById('apiSettings').style.display = 'none';
         }
@@ -238,7 +268,6 @@
 
             if (!text.trim()) { alert("请先输入需要翻译的内容！"); return; }
             if (!apiKey) {
-                alert("请先设置 Google API Key！");
                 document.getElementById('apiSettings').style.display = 'block';
                 return;
             }
@@ -251,7 +280,7 @@
             const payload = {
                 systemInstruction: { parts: [{ text: systemPrompt }] },
                 contents: [{ parts: [{ text: text }] }],
-                generationConfig: { temperature: 0.7 } // 稍微调高了一点温度，让 Rap 更有创造力和灵性
+                generationConfig: { temperature: 0.7 } 
             };
 
             try {
@@ -260,17 +289,14 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
-
                 const data = await response.json();
-
-                if (!response.ok) { throw new Error(data.error?.message || "请求失败"); }
-
+                if (!response.ok) throw new Error(data.error?.message || "请求失败");
+                
                 if (data.candidates && data.candidates[0].content.parts[0].text) {
                     outputBox.value = data.candidates[0].content.parts[0].text.trim();
                 } else {
                     outputBox.value = "❌ 未获取到翻译结果，可能触发了安全拦截。";
                 }
-
             } catch (error) {
                 console.error(error);
                 outputBox.value = `❌ 翻译出错：\n${error.message}\n请检查 API Key 是否正确或网络是否连通。`;
@@ -281,16 +307,15 @@
         function copyResult() {
             const outputBox = document.getElementById('outputText');
             if (!outputBox.value.trim() || outputBox.value.startsWith("⏳") || outputBox.value.startsWith("❌")) return;
-            
             outputBox.select();
             outputBox.setSelectionRange(0, 99999);
             navigator.clipboard.writeText(outputBox.value).then(() => {
                 const btn = document.getElementById('copyBtn');
                 const oldText = btn.innerText;
-                btn.innerText = "✅ 复制成功";
+                btn.innerText = "✅ 成功";
                 btn.style.backgroundColor = "#67c23a";
                 setTimeout(() => { btn.innerText = oldText; btn.style.backgroundColor = "#e6a23c"; }, 2000);
-            }).catch(err => { alert("复制失败，请尝试长按文本框手动复制。"); });
+            }).catch(err => { alert("复制失败，请尝试手动复制。"); });
         }
 
         function clearText() {
