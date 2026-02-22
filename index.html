@@ -119,6 +119,7 @@
             <option value="英语">翻译为：英语</option>
             <option value="地道英语口语">翻译为：地道英语口语 (含润色)</option>
             <option value="商务正式英语">翻译为：商务正式英语 (发邮件用)</option>
+            <option value="纯正的西海岸黑人Hip-Hop说唱风格英语，大量使用AAVE俚语和街头词汇，语气要酷">翻译为：西海岸 Rap 英语 🎤</option>
             
             <option value="中文">翻译为：中文</option>
             
@@ -245,12 +246,12 @@
             outputBox.value = "⏳ Gemini 正在思考并翻译中...";
 
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
-            const systemPrompt = `你是一个精通多国语言的顶级翻译官。请将用户输入的内容翻译成【${targetLang}】。要求：翻译要准确、流畅、符合目标语言的母语习惯。如果目标语言是口语或商务英语，请严格调整语气。只返回纯文本翻译结果，不要输出任何解释、拼音、音标或多余的对话。`;
+            const systemPrompt = `你是一个精通多国语言的顶级翻译官。请将用户输入的内容翻译成【${targetLang}】。要求：翻译要准确、流畅、符合目标语言的母语习惯。如果目标语言是口语、商务英语或特定风格(如Rap)，请严格按照该风格调整语气和用词。只返回纯文本翻译结果，不要输出任何解释、拼音、音标或多余的对话。`;
 
             const payload = {
                 systemInstruction: { parts: [{ text: systemPrompt }] },
                 contents: [{ parts: [{ text: text }] }],
-                generationConfig: { temperature: 0.2 }
+                generationConfig: { temperature: 0.7 } // 稍微调高了一点温度，让 Rap 更有创造力和灵性
             };
 
             try {
