@@ -51,10 +51,10 @@
         .save-btn { background-color: #409eff; color: white; border: none; cursor: pointer; padding: 10px; font-weight: bold;}
         .save-btn:active { background-color: #3a8ee6; }
 
-        /* 新增：输入框容器，用来定位麦克风按钮 */
+        /* 语音输入框容器 */
         .input-wrapper { position: relative; }
         
-        /* 新增：麦克风按钮样式 */
+        /* 麦克风按钮样式 */
         .mic-btn {
             position: absolute;
             right: 10px;
@@ -116,13 +116,17 @@
         </div>
         
         <select id="targetLang">
-            <option value="越南语">翻译为：越南语 (Vietnamese)</option>
-            <option value="泰语">翻译为：泰语 (Thai)</option>
             <option value="英语">翻译为：英语</option>
-            <option value="中文">翻译为：中文</option>
-            <option value="日语">翻译为：日语</option>
             <option value="地道英语口语">翻译为：地道英语口语 (含润色)</option>
             <option value="商务正式英语">翻译为：商务正式英语 (发邮件用)</option>
+            
+            <option value="中文">翻译为：中文</option>
+            
+            <option value="日语">翻译为：日语</option>
+            <option value="韩语">翻译为：韩语</option>
+            
+            <option value="越南语">翻译为：越南语</option>
+            <option value="泰语">翻译为：泰语</option>
         </select>
         
         <button class="translate-btn" onclick="translateWithGemini()">🚀 召唤 Gemini 翻译</button>
@@ -141,7 +145,6 @@
         let isRecording = false;
 
         function initSpeech() {
-            // 兼容不同浏览器的语音接口
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (!SpeechRecognition) {
                 alert("当前浏览器不支持语音输入，请尝试使用 Safari 或 Chrome 浏览器。");
@@ -150,9 +153,9 @@
             }
 
             recognition = new SpeechRecognition();
-            recognition.lang = 'zh-CN'; // 默认识别中文
-            recognition.continuous = false; // 说话停顿后自动结束
-            recognition.interimResults = false; // 只返回最终结果
+            recognition.lang = 'zh-CN'; 
+            recognition.continuous = false; 
+            recognition.interimResults = false; 
 
             recognition.onstart = function() {
                 isRecording = true;
@@ -164,7 +167,6 @@
             recognition.onresult = function(event) {
                 const transcript = event.results[0][0].transcript;
                 const inputBox = document.getElementById('inputText');
-                // 将识别的文字追加到输入框
                 if (inputBox.value) {
                     inputBox.value += " " + transcript;
                 } else {
@@ -202,7 +204,7 @@
             document.getElementById('inputText').placeholder = "请输入或语音输入需要翻译的内容...";
         }
 
-        // === 以下为原有的翻译、复制和设置逻辑 ===
+        // === API设置与翻译逻辑 ===
         window.onload = function() {
             const savedKey = localStorage.getItem('gemini_api_key');
             if (savedKey) {
